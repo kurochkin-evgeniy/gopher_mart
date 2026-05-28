@@ -14,6 +14,7 @@ import (
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
+// RunMigrations применяет миграции базы данных, встроенные в приложение.
 func RunMigrations(databaseURI string) error {
 	source, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {

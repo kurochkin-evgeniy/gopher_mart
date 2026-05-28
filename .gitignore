@@ -1,23 +1,23 @@
-# Binaries for programs and plugins
+# Бинарные файлы программ и плагинов
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
 
-# Test binary, built with `go test -c`
+# Тестовые бинарники (собраны через `go test -c`)
 *.test
 
-# Output of the go coverage tool, specifically when used with LiteIDE
+# Результаты покрытия (например, при использовании LiteIDE)
 *.out
 
-# Binaries
+# Бинарники проекта
 cmd/gophermart/main
 cmd/gophermart/gophermart
 
-# Dependency directories (remove the comment below to include it)
+# Директории зависимостей (уберите комментарий ниже, чтобы включить)
 vendor/
 
-# IDEs directories
+# Директории IDE
 .idea
 .vscode

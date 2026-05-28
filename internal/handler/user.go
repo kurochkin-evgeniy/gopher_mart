@@ -1,6 +1,8 @@
+// Package handler содержит HTTP-хендлеры бизнес-логики.
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,11 +15,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserHandler struct {
-	storage *postgres.Storage
+// UserStorage описывает операции хранилища пользователей.
+type UserStorage interface {
+	// CreateUser создаёт пользователя и возвращает его идентификатор.
+	CreateUser(ctx context.Context, login, passwordHash string) (int64, error)
 }
 
-func NewUserHandler(storage *postgres.Storage) *UserHandler {
+// UserHandler реализует обработчики HTTP запросов, связанных с пользователями.
+type UserHandler struct {
+	storage UserStorage
+}
+
+// NewUserHandler создаёт хендлер пользователя на базе указанного хранилища.
+func NewUserHandler(storage UserStorage) *UserHandler {
 	return &UserHandler{storage: storage}
 }
 
@@ -26,6 +36,7 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
+// Register обрабатывает регистрацию пользователя по адресу POST /api/user/register.
 func (h *UserHandler) Register(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)

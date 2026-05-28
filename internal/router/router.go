@@ -1,3 +1,4 @@
+// Package router формирует маршрутизацию HTTP API.
 package router
 
 import (
@@ -5,18 +6,15 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
 )
 
+// New настраивает маршрутизатор с зарегистрированными обработчиками API.
 func New(userHandler *handler.UserHandler) http.Handler {
 	r := chi.NewRouter()
 
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
 	r.Use(requestLogger)
-	r.Use(middleware.Recoverer)
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", userHandler.Register)
@@ -28,13 +26,23 @@ func New(userHandler *handler.UserHandler) http.Handler {
 func requestLogger(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-		next.ServeHTTP(ww, r)
+		rec := &statusRecorder{ResponseWriter: w, status: http.StatusOK}
+		next.ServeHTTP(rec, r)
 		logging.Sugar.Infow("request",
 			"method", r.Method,
 			"path", r.URL.Path,
-			"status", ww.Status(),
+			"status", rec.status,
 			"duration", time.Since(start),
 		)
 	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (rec *statusRecorder) WriteHeader(code int) {
+	rec.status = code
+	rec.ResponseWriter.WriteHeader(code)
 }

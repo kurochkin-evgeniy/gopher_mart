@@ -1,3 +1,4 @@
+// Package postgres реализует доступ к данным в PostgreSQL.
 package postgres
 
 import (
@@ -10,12 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// ErrLoginTaken возвращается, когда пытаются создать пользователя с уже занятым логином.
 var ErrLoginTaken = errors.New("login already taken")
 
+// Storage предоставляет методы для работы с данными пользователей в PostgreSQL.
 type Storage struct {
 	pool *pgxpool.Pool
 }
 
+// New создаёт хранилище и выполняет миграции схемы.
 func New(ctx context.Context, databaseURI string) (*Storage, error) {
 	if err := RunMigrations(databaseURI); err != nil {
 		return nil, err
@@ -34,10 +38,12 @@ func New(ctx context.Context, databaseURI string) (*Storage, error) {
 	return &Storage{pool: pool}, nil
 }
 
+// Close закрывает пул соединений к базе данных.
 func (s *Storage) Close() {
 	s.pool.Close()
 }
 
+// CreateUser создаёт пользователя с указанным логином и хешем пароля.
 func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (int64, error) {
 	const query = `
 		INSERT INTO users (login, password_hash)
@@ -48,16 +54,13 @@ func (s *Storage) CreateUser(ctx context.Context, login, passwordHash string) (i
 	var id int64
 	err := s.pool.QueryRow(ctx, query, login, passwordHash).Scan(&id)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return 0, ErrLoginTaken
-		}
-		return 0, fmt.Errorf("insert user: %w", err)
+		return 0, mapCreateUserError(err)
 	}
 
 	return id, nil
 }
 
+// GetUserByLogin возвращает идентификатор пользователя и хеш пароля по логину.
 func (s *Storage) GetUserByLogin(ctx context.Context, login string) (int64, string, error) {
 	const query = `
 		SELECT id, password_hash
@@ -76,4 +79,12 @@ func (s *Storage) GetUserByLogin(ctx context.Context, login string) (int64, stri
 	}
 
 	return id, passwordHash, nil
+}
+
+func mapCreateUserError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return ErrLoginTaken
+	}
+	return fmt.Errorf("insert user: %w", err)
 }

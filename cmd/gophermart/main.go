@@ -1,3 +1,4 @@
+// Package main запускает HTTP-сервис накопительной системы "Гофермарт".
 package main
 
 import (

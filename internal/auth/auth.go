@@ -1,3 +1,4 @@
+// Package auth предоставляет функции для генерации и проверки JWT-токенов.
 package auth
 
 import (
@@ -8,21 +9,26 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// AuthHeader задаёт имя HTTP-заголовка, в котором передается токен.
 const (
 	AuthHeader = "Authorization"
+	// AuthScheme задаёт схему в заголовке Authorization (например, "Bearer <token>").
 	AuthScheme = "Bearer"
 )
 
 var (
+	// ErrInvalidToken возвращается при попытке разобрать некорректный или просроченный токен.
 	ErrInvalidToken = errors.New("invalid token")
 	secret          = []byte("gophermart-secret-key")
 )
 
+// Claims описывает содержимое JWT и идентификатор пользователя.
 type Claims struct {
 	UserID int64 `json:"uid"`
 	jwt.RegisteredClaims
 }
 
+// GenerateToken генерирует JWT для пользователя с идентификатором userID.
 func GenerateToken(userID int64) (string, error) {
 	claims := Claims{
 		UserID: userID,
@@ -36,6 +42,7 @@ func GenerateToken(userID int64) (string, error) {
 	return token.SignedString(secret)
 }
 
+// ParseToken разбирает строку токена и возвращает Claims при успешной валидации.
 func ParseToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {

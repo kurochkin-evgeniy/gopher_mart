@@ -1,3 +1,4 @@
+// Package config читает конфигурацию сервиса (флаги и переменные окружения).
 package config
 
 import (
@@ -13,6 +14,7 @@ type Config struct {
 	AccrualSystemAddress string // -r / ACCRUAL_SYSTEM_ADDRESS
 }
 
+// Load загружает конфигурацию сервиса из флагов и переменных окружения.
 func Load() *Config {
 	cfg := &Config{}
 
@@ -29,6 +31,7 @@ func Load() *Config {
 	return cfg
 }
 
+// valueFromFlagOrEnv выбирает значение: сначала флаг, затем переменная окружения, затем default.
 func valueFromFlagOrEnv(flagValue, envKey, defaultValue string) string {
 	if flagValue != "" {
 		return flagValue
