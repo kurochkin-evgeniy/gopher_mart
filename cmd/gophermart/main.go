@@ -37,9 +37,10 @@ func main() {
 	defer storage.Close()
 
 	userHandler := handler.NewUserHandler(storage)
+	orderHandler := handler.NewOrderHandler(storage)
 	srv := &http.Server{
 		Addr:    cfg.RunAddress,
-		Handler: router.New(userHandler),
+		Handler: router.New(userHandler, orderHandler),
 	}
 
 	go func() {

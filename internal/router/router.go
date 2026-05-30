@@ -8,10 +8,11 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/middleware"
 )
 
 // New настраивает маршрутизатор с зарегистрированными обработчиками API.
-func New(userHandler *handler.UserHandler) http.Handler {
+func New(userHandler *handler.UserHandler, orderHandler *handler.OrderHandler) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(requestLogger)
@@ -19,6 +20,12 @@ func New(userHandler *handler.UserHandler) http.Handler {
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", userHandler.Register)
 		r.Post("/login", userHandler.Login)
+
+		r.Group(func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Post("/orders", orderHandler.Upload)
+			r.Get("/orders", orderHandler.List)
+		})
 	})
 
 	return r
