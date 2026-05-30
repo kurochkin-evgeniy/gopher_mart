@@ -10,11 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/accrual"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/config"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/router"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/worker"
 )
 
 func main() {
@@ -38,9 +40,16 @@ func main() {
 
 	userHandler := handler.NewUserHandler(storage)
 	orderHandler := handler.NewOrderHandler(storage)
+	balanceHandler := handler.NewBalanceHandler(storage)
 	srv := &http.Server{
 		Addr:    cfg.RunAddress,
-		Handler: router.New(userHandler, orderHandler),
+		Handler: router.New(userHandler, orderHandler, balanceHandler),
+	}
+
+	if cfg.AccrualSystemAddress != "" {
+		accrualClient := accrual.NewClient(cfg.AccrualSystemAddress)
+		accrualWorker := worker.NewAccrualWorker(storage, accrualClient, time.Second)
+		go accrualWorker.Run(ctx)
 	}
 
 	go func() {

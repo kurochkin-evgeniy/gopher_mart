@@ -39,10 +39,25 @@ func (stubOrderStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]p
 	return nil, nil
 }
 
+type stubBalanceStorage struct{}
+
+func (stubBalanceStorage) GetBalance(ctx context.Context, userID int64) (postgres.Balance, error) {
+	return postgres.Balance{}, nil
+}
+
+func (stubBalanceStorage) Withdraw(ctx context.Context, userID int64, orderNumber string, sum float64) error {
+	return nil
+}
+
+func (stubBalanceStorage) ListWithdrawals(ctx context.Context, userID int64) ([]postgres.Withdrawal, error) {
+	return nil, nil
+}
+
 func newTestRouter() http.Handler {
 	userHandler := handler.NewUserHandler(stubUserStorage{})
 	orderHandler := handler.NewOrderHandler(stubOrderStorage{})
-	return New(userHandler, orderHandler)
+	balanceHandler := handler.NewBalanceHandler(stubBalanceStorage{})
+	return New(userHandler, orderHandler, balanceHandler)
 }
 
 func TestMain(m *testing.M) {
@@ -133,6 +148,32 @@ func TestUploadOrderUnauthorized(t *testing.T) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: got %d", resp.StatusCode)
+	}
+}
+
+func TestGetBalanceRoute(t *testing.T) {
+	srv := httptest.NewServer(newTestRouter())
+	t.Cleanup(srv.Close)
+
+	token, err := auth.GenerateToken(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/user/balance", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req.Header.Set(auth.AuthHeader, auth.AuthScheme+" "+token)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 }

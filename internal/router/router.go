@@ -12,7 +12,11 @@ import (
 )
 
 // New настраивает маршрутизатор с зарегистрированными обработчиками API.
-func New(userHandler *handler.UserHandler, orderHandler *handler.OrderHandler) http.Handler {
+func New(
+	userHandler *handler.UserHandler,
+	orderHandler *handler.OrderHandler,
+	balanceHandler *handler.BalanceHandler,
+) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(requestLogger)
@@ -25,6 +29,9 @@ func New(userHandler *handler.UserHandler, orderHandler *handler.OrderHandler) h
 			r.Use(middleware.Authenticate)
 			r.Post("/orders", orderHandler.Upload)
 			r.Get("/orders", orderHandler.List)
+			r.Get("/balance", balanceHandler.GetBalance)
+			r.Post("/balance/withdraw", balanceHandler.Withdraw)
+			r.Get("/withdrawals", balanceHandler.ListWithdrawals)
 		})
 	})
 
