@@ -18,6 +18,7 @@ func New(userHandler *handler.UserHandler) http.Handler {
 
 	r.Route("/api/user", func(r chi.Router) {
 		r.Post("/register", userHandler.Register)
+		r.Post("/login", userHandler.Login)
 	})
 
 	return r

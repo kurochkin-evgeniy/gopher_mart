@@ -14,6 +14,9 @@ import (
 // ErrLoginTaken возвращается, когда пытаются создать пользователя с уже занятым логином.
 var ErrLoginTaken = errors.New("login already taken")
 
+// ErrUserNotFound возвращается, когда пользователь с указанным логином не найден.
+var ErrUserNotFound = errors.New("user not found")
+
 // Storage предоставляет методы для работы с данными пользователей в PostgreSQL.
 type Storage struct {
 	pool *pgxpool.Pool
@@ -73,7 +76,7 @@ func (s *Storage) GetUserByLogin(ctx context.Context, login string) (int64, stri
 	err := s.pool.QueryRow(ctx, query, login).Scan(&id, &passwordHash)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return 0, "", pgx.ErrNoRows
+			return 0, "", ErrUserNotFound
 		}
 		return 0, "", fmt.Errorf("get user by login: %w", err)
 	}

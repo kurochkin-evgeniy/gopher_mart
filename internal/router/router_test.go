@@ -11,12 +11,17 @@ import (
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/auth"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
 )
 
 type stubUserStorage struct{}
 
 func (stubUserStorage) CreateUser(ctx context.Context, login, passwordHash string) (int64, error) {
 	return 1, nil
+}
+
+func (stubUserStorage) GetUserByLogin(ctx context.Context, login string) (int64, string, error) {
+	return 0, "", postgres.ErrUserNotFound
 }
 
 func TestMain(m *testing.M) {
@@ -49,6 +54,26 @@ func TestRegisterRoute(t *testing.T) {
 	authHeader := resp.Header.Get(auth.AuthHeader)
 	if authHeader == "" {
 		t.Fatal("expected Authorization header")
+	}
+}
+
+func TestLoginRoute(t *testing.T) {
+	h := handler.NewUserHandler(stubUserStorage{})
+	srv := httptest.NewServer(New(h))
+	t.Cleanup(srv.Close)
+
+	resp, err := http.Post(
+		srv.URL+"/api/user/login",
+		"application/json",
+		bytes.NewBufferString(`{"login":"user","password":"secret"}`),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status: got %d", resp.StatusCode)
 	}
 }
 

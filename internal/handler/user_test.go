@@ -13,14 +13,26 @@ import (
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/auth"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type mockUserStorage struct {
-	createUser func(ctx context.Context, login, passwordHash string) (int64, error)
+	createUser      func(ctx context.Context, login, passwordHash string) (int64, error)
+	getUserByLogin  func(ctx context.Context, login string) (int64, string, error)
 }
 
 func (m *mockUserStorage) CreateUser(ctx context.Context, login, passwordHash string) (int64, error) {
+	if m.createUser == nil {
+		return 0, errors.New("createUser not implemented")
+	}
 	return m.createUser(ctx, login, passwordHash)
+}
+
+func (m *mockUserStorage) GetUserByLogin(ctx context.Context, login string) (int64, string, error) {
+	if m.getUserByLogin == nil {
+		return 0, "", errors.New("getUserByLogin not implemented")
+	}
+	return m.getUserByLogin(ctx, login)
 }
 
 func TestMain(m *testing.M) {
@@ -176,6 +188,121 @@ func TestRegisterStorageError(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	h.Register(rec, req)
+
+	if rec.Code != http.StatusInternalServerError {
+		t.Fatalf("status: got %d", rec.Code)
+	}
+}
+
+func TestLoginSuccess(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	storage := &mockUserStorage{
+		getUserByLogin: func(ctx context.Context, login string) (int64, string, error) {
+			if login != "user" {
+				t.Fatalf("unexpected login: %q", login)
+			}
+			return 5, string(hash), nil
+		},
+	}
+
+	h := NewUserHandler(storage)
+	req := httptest.NewRequest(http.MethodPost, "/api/user/login", strings.NewReader(`{"login":"user","password":"secret"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status: got %d, body %q", rec.Code, rec.Body.String())
+	}
+
+	token := strings.TrimPrefix(rec.Header().Get(auth.AuthHeader), auth.AuthScheme+" ")
+	claims, err := auth.ParseToken(token)
+	if err != nil {
+		t.Fatalf("parse token: %v", err)
+	}
+	if claims.UserID != 5 {
+		t.Fatalf("user id in token: got %d", claims.UserID)
+	}
+}
+
+func TestLoginUnauthorized(t *testing.T) {
+	hash, err := bcrypt.GenerateFromPassword([]byte("secret"), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		storage *mockUserStorage
+		body    string
+	}{
+		{
+			name: "user not found",
+			storage: &mockUserStorage{
+				getUserByLogin: func(ctx context.Context, login string) (int64, string, error) {
+					return 0, "", postgres.ErrUserNotFound
+				},
+			},
+			body: `{"login":"missing","password":"secret"}`,
+		},
+		{
+			name: "wrong password",
+			storage: &mockUserStorage{
+				getUserByLogin: func(ctx context.Context, login string) (int64, string, error) {
+					return 1, string(hash), nil
+				},
+			},
+			body: `{"login":"user","password":"wrong"}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			h := NewUserHandler(tc.storage)
+			req := httptest.NewRequest(http.MethodPost, "/api/user/login", strings.NewReader(tc.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+
+			h.Login(rec, req)
+
+			if rec.Code != http.StatusUnauthorized {
+				t.Fatalf("status: got %d", rec.Code)
+			}
+		})
+	}
+}
+
+func TestLoginBadRequest(t *testing.T) {
+	h := NewUserHandler(&mockUserStorage{})
+	req := httptest.NewRequest(http.MethodPost, "/api/user/login", strings.NewReader(`{"login":"","password":"p"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status: got %d", rec.Code)
+	}
+}
+
+func TestLoginStorageError(t *testing.T) {
+	storage := &mockUserStorage{
+		getUserByLogin: func(ctx context.Context, login string) (int64, string, error) {
+			return 0, "", errors.New("db down")
+		},
+	}
+
+	h := NewUserHandler(storage)
+	req := httptest.NewRequest(http.MethodPost, "/api/user/login", strings.NewReader(`{"login":"user","password":"secret"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	h.Login(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("status: got %d", rec.Code)
