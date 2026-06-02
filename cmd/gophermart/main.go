@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -33,8 +34,10 @@ func main() {
 		logging.Sugar.Fatal("DATABASE_URI is required")
 	}
 
-	ctx := context.Background()
-	storage, err := postgres.New(ctx, cfg.DatabaseURI)
+	appCtx, stopApp := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopApp()
+
+	storage, err := postgres.New(context.Background(), cfg.DatabaseURI)
 	if err != nil {
 		logging.Sugar.Fatalw("init storage", "error", err)
 	}
@@ -48,10 +51,15 @@ func main() {
 		Handler: router.New(userHandler, orderHandler, balanceHandler),
 	}
 
+	var workerWG sync.WaitGroup
 	if cfg.AccrualSystemAddress != "" {
 		accrualClient := accrual.NewClient(cfg.AccrualSystemAddress)
 		accrualWorker := worker.NewAccrualWorker(storage, accrualClient, time.Second)
-		go accrualWorker.Run(ctx)
+		workerWG.Add(1)
+		go func() {
+			defer workerWG.Done()
+			accrualWorker.Run(appCtx)
+		}()
 	}
 
 	go func() {
@@ -64,9 +72,8 @@ func main() {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	<-stop
+	<-appCtx.Done()
+	logging.Sugar.Infow("shutting down")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -74,4 +81,6 @@ func main() {
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logging.Sugar.Errorw("server shutdown", "error", err)
 	}
+
+	workerWG.Wait()
 }
