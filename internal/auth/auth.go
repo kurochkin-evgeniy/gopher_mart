@@ -19,8 +19,13 @@ const (
 var (
 	// ErrInvalidToken возвращается при попытке разобрать некорректный или просроченный токен.
 	ErrInvalidToken = errors.New("invalid token")
-	secret          = []byte("gophermart-secret-key")
+	secret          []byte
 )
+
+// Init задаёт ключ подписи JWT. Вызывайте один раз при старте приложения (например, из main после загрузки конфигурации).
+func Init(jwtSecret string) {
+	secret = []byte(jwtSecret)
+}
 
 // Claims описывает содержимое JWT и идентификатор пользователя.
 type Claims struct {

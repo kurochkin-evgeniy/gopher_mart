@@ -2,9 +2,15 @@ package auth
 
 import (
 	"errors"
+	"os"
 	"strings"
 	"testing"
 )
+
+func TestMain(m *testing.M) {
+	Init("gophermart-secret-key")
+	os.Exit(m.Run())
+}
 
 func TestGenerateAndParseToken(t *testing.T) {
 	token, err := GenerateToken(42)

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/accrual"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/auth"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/config"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
@@ -26,6 +27,7 @@ func main() {
 	defer logging.Sync()
 
 	cfg := config.Load()
+	auth.Init(cfg.JWTSecret)
 
 	if cfg.DatabaseURI == "" {
 		logging.Sugar.Fatal("DATABASE_URI is required")
