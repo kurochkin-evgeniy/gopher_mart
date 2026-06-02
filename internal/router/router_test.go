@@ -12,6 +12,7 @@ import (
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/auth"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/handler"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/model"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
 )
 
@@ -41,15 +42,15 @@ func (stubOrderStorage) ListOrdersByUser(ctx context.Context, userID int64) ([]p
 
 type stubBalanceStorage struct{}
 
-func (stubBalanceStorage) GetBalance(ctx context.Context, userID int64) (postgres.Balance, error) {
-	return postgres.Balance{}, nil
+func (stubBalanceStorage) GetBalance(ctx context.Context, userID int64) (model.Balance, error) {
+	return model.Balance{}, nil
 }
 
 func (stubBalanceStorage) Withdraw(ctx context.Context, userID int64, orderNumber string, sum float64) error {
 	return nil
 }
 
-func (stubBalanceStorage) ListWithdrawals(ctx context.Context, userID int64) ([]postgres.Withdrawal, error) {
+func (stubBalanceStorage) ListWithdrawals(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
 	return nil, nil
 }
 

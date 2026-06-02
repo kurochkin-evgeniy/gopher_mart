@@ -2,29 +2,13 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"time"
+
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/model"
 )
 
-// ErrInsufficientFunds возвращается, когда на счёте недостаточно баллов для списания.
-var ErrInsufficientFunds = errors.New("insufficient funds")
-
-// Withdrawal описывает операцию списания баллов.
-type Withdrawal struct {
-	Order       string
-	Sum         float64
-	ProcessedAt time.Time
-}
-
-// Balance содержит текущий баланс и сумму всех списаний пользователя.
-type Balance struct {
-	Current   float64
-	Withdrawn float64
-}
-
 // GetBalance возвращает текущий баланс и сумму списаний пользователя.
-func (s *Storage) GetBalance(ctx context.Context, userID int64) (Balance, error) {
+func (s *Storage) GetBalance(ctx context.Context, userID int64) (model.Balance, error) {
 	const query = `
 		SELECT
 			COALESCE((
@@ -43,10 +27,10 @@ func (s *Storage) GetBalance(ctx context.Context, userID int64) (Balance, error)
 			), 0) AS withdrawn
 	`
 
-	var balance Balance
+	var balance model.Balance
 	err := s.pool.QueryRow(ctx, query, userID).Scan(&balance.Current, &balance.Withdrawn)
 	if err != nil {
-		return Balance{}, fmt.Errorf("get balance: %w", err)
+		return model.Balance{}, fmt.Errorf("get balance: %w", err)
 	}
 
 	return balance, nil
@@ -79,7 +63,7 @@ func (s *Storage) Withdraw(ctx context.Context, userID int64, orderNumber string
 	}
 
 	if current < sum {
-		return ErrInsufficientFunds
+		return model.ErrInsufficientFunds
 	}
 
 	const insertQuery = `
@@ -99,7 +83,7 @@ func (s *Storage) Withdraw(ctx context.Context, userID int64, orderNumber string
 }
 
 // ListWithdrawals возвращает списания пользователя, отсортированные по processed_at (новые первые).
-func (s *Storage) ListWithdrawals(ctx context.Context, userID int64) ([]Withdrawal, error) {
+func (s *Storage) ListWithdrawals(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
 	const query = `
 		SELECT order_number, sum, processed_at
 		FROM withdrawals
@@ -113,9 +97,9 @@ func (s *Storage) ListWithdrawals(ctx context.Context, userID int64) ([]Withdraw
 	}
 	defer rows.Close()
 
-	var withdrawals []Withdrawal
+	var withdrawals []model.Withdrawal
 	for rows.Next() {
-		var w Withdrawal
+		var w model.Withdrawal
 		if err := rows.Scan(&w.Order, &w.Sum, &w.ProcessedAt); err != nil {
 			return nil, fmt.Errorf("scan withdrawal: %w", err)
 		}

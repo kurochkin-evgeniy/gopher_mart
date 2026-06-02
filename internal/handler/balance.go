@@ -10,15 +10,15 @@ import (
 
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/logging"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/middleware"
-	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/model"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/validate"
 )
 
 // BalanceStorage описывает операции хранилища для баланса и списаний.
 type BalanceStorage interface {
-	GetBalance(ctx context.Context, userID int64) (postgres.Balance, error)
+	GetBalance(ctx context.Context, userID int64) (model.Balance, error)
 	Withdraw(ctx context.Context, userID int64, orderNumber string, sum float64) error
-	ListWithdrawals(ctx context.Context, userID int64) ([]postgres.Withdrawal, error)
+	ListWithdrawals(ctx context.Context, userID int64) ([]model.Withdrawal, error)
 }
 
 // BalanceHandler реализует HTTP-хендлеры баланса и списаний.
@@ -97,7 +97,7 @@ func (h *BalanceHandler) Withdraw(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.storage.Withdraw(r.Context(), userID, req.Order, req.Sum); err != nil {
-		if errors.Is(err, postgres.ErrInsufficientFunds) {
+		if errors.Is(err, model.ErrInsufficientFunds) {
 			http.Error(w, "insufficient funds", http.StatusPaymentRequired)
 			return
 		}

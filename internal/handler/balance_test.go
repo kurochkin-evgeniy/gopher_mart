@@ -9,16 +9,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kurochkin-evgeniy/gopher_mart/internal/storage/postgres"
+	"github.com/kurochkin-evgeniy/gopher_mart/internal/model"
 )
 
 type mockBalanceStorage struct {
-	getBalance       func(ctx context.Context, userID int64) (postgres.Balance, error)
+	getBalance       func(ctx context.Context, userID int64) (model.Balance, error)
 	withdraw         func(ctx context.Context, userID int64, orderNumber string, sum float64) error
-	listWithdrawals  func(ctx context.Context, userID int64) ([]postgres.Withdrawal, error)
+	listWithdrawals  func(ctx context.Context, userID int64) ([]model.Withdrawal, error)
 }
 
-func (m *mockBalanceStorage) GetBalance(ctx context.Context, userID int64) (postgres.Balance, error) {
+func (m *mockBalanceStorage) GetBalance(ctx context.Context, userID int64) (model.Balance, error) {
 	return m.getBalance(ctx, userID)
 }
 
@@ -26,14 +26,14 @@ func (m *mockBalanceStorage) Withdraw(ctx context.Context, userID int64, orderNu
 	return m.withdraw(ctx, userID, orderNumber, sum)
 }
 
-func (m *mockBalanceStorage) ListWithdrawals(ctx context.Context, userID int64) ([]postgres.Withdrawal, error) {
+func (m *mockBalanceStorage) ListWithdrawals(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
 	return m.listWithdrawals(ctx, userID)
 }
 
 func TestGetBalance(t *testing.T) {
 	storage := &mockBalanceStorage{
-		getBalance: func(ctx context.Context, userID int64) (postgres.Balance, error) {
-			return postgres.Balance{Current: 500.5, Withdrawn: 42}, nil
+		getBalance: func(ctx context.Context, userID int64) (model.Balance, error) {
+			return model.Balance{Current: 500.5, Withdrawn: 42}, nil
 		},
 	}
 
@@ -81,7 +81,7 @@ func TestWithdrawSuccess(t *testing.T) {
 func TestWithdrawInsufficientFunds(t *testing.T) {
 	storage := &mockBalanceStorage{
 		withdraw: func(ctx context.Context, userID int64, orderNumber string, sum float64) error {
-			return postgres.ErrInsufficientFunds
+			return model.ErrInsufficientFunds
 		},
 	}
 
@@ -115,8 +115,8 @@ func TestWithdrawUnprocessable(t *testing.T) {
 func TestListWithdrawals(t *testing.T) {
 	processedAt := time.Date(2020, 12, 9, 16, 9, 57, 0, time.FixedZone("MSK", 3*3600))
 	storage := &mockBalanceStorage{
-		listWithdrawals: func(ctx context.Context, userID int64) ([]postgres.Withdrawal, error) {
-			return []postgres.Withdrawal{
+		listWithdrawals: func(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
+			return []model.Withdrawal{
 				{Order: "2377225624", Sum: 500, ProcessedAt: processedAt},
 			}, nil
 		},
@@ -139,7 +139,7 @@ func TestListWithdrawals(t *testing.T) {
 
 func TestListWithdrawalsNoContent(t *testing.T) {
 	storage := &mockBalanceStorage{
-		listWithdrawals: func(ctx context.Context, userID int64) ([]postgres.Withdrawal, error) {
+		listWithdrawals: func(ctx context.Context, userID int64) ([]model.Withdrawal, error) {
 			return nil, nil
 		},
 	}
@@ -180,8 +180,8 @@ func TestBalanceUnauthorized(t *testing.T) {
 
 func TestGetBalanceStorageError(t *testing.T) {
 	storage := &mockBalanceStorage{
-		getBalance: func(ctx context.Context, userID int64) (postgres.Balance, error) {
-			return postgres.Balance{}, errors.New("db down")
+		getBalance: func(ctx context.Context, userID int64) (model.Balance, error) {
+			return model.Balance{}, errors.New("db down")
 		},
 	}
 
