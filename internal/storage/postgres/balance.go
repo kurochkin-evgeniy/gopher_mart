@@ -4,35 +4,46 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/kurochkin-evgeniy/gopher_mart/internal/model"
 )
 
+const balanceSQL = `
+	SELECT
+		COALESCE((
+			SELECT SUM(accrual)
+			FROM orders
+			WHERE user_id = $1 AND status = 'PROCESSED' AND accrual IS NOT NULL
+		), 0) - COALESCE((
+			SELECT SUM(sum)
+			FROM withdrawals
+			WHERE user_id = $1
+		), 0) AS current,
+		COALESCE((
+			SELECT SUM(sum)
+			FROM withdrawals
+			WHERE user_id = $1
+		), 0) AS withdrawn
+`
+
+type rowQuerier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+func queryBalance(ctx context.Context, q rowQuerier, userID int64) (model.Balance, error) {
+	var balance model.Balance
+	if err := q.QueryRow(ctx, balanceSQL, userID).Scan(&balance.Current, &balance.Withdrawn); err != nil {
+		return model.Balance{}, fmt.Errorf("query balance: %w", err)
+	}
+	return balance, nil
+}
+
 // GetBalance возвращает текущий баланс и сумму списаний пользователя.
 func (s *Storage) GetBalance(ctx context.Context, userID int64) (model.Balance, error) {
-	const query = `
-		SELECT
-			COALESCE((
-				SELECT SUM(accrual)
-				FROM orders
-				WHERE user_id = $1 AND status = 'PROCESSED' AND accrual IS NOT NULL
-			), 0) - COALESCE((
-				SELECT SUM(sum)
-				FROM withdrawals
-				WHERE user_id = $1
-			), 0) AS current,
-			COALESCE((
-				SELECT SUM(sum)
-				FROM withdrawals
-				WHERE user_id = $1
-			), 0) AS withdrawn
-	`
-
-	var balance model.Balance
-	err := s.pool.QueryRow(ctx, query, userID).Scan(&balance.Current, &balance.Withdrawn)
+	balance, err := queryBalance(ctx, s.pool, userID)
 	if err != nil {
 		return model.Balance{}, fmt.Errorf("get balance: %w", err)
 	}
-
 	return balance, nil
 }
 
@@ -44,25 +55,12 @@ func (s *Storage) Withdraw(ctx context.Context, userID int64, orderNumber string
 	}
 	defer tx.Rollback(ctx)
 
-	const balanceQuery = `
-		SELECT
-			COALESCE((
-				SELECT SUM(accrual)
-				FROM orders
-				WHERE user_id = $1 AND status = 'PROCESSED' AND accrual IS NOT NULL
-			), 0) - COALESCE((
-				SELECT SUM(sum)
-				FROM withdrawals
-				WHERE user_id = $1
-			), 0)
-	`
-
-	var current float64
-	if err := tx.QueryRow(ctx, balanceQuery, userID).Scan(&current); err != nil {
+	balance, err := queryBalance(ctx, tx, userID)
+	if err != nil {
 		return fmt.Errorf("get current balance: %w", err)
 	}
 
-	if current < sum {
+	if balance.Current < sum {
 		return model.ErrInsufficientFunds
 	}
 
